@@ -9,25 +9,46 @@ part of 'analysis_result.dart';
 AnalysisResult _$AnalysisResultFromJson(Map<String, dynamic> json) =>
     AnalysisResult(
       id: json['id'] as String,
-      score: (json['score'] as num).toInt(),
-      keywords:
-          (json['keywords'] as List<dynamic>).map((e) => e as String).toList(),
+      score: json['score'] as int,
+      keywords: (json['keywords'] as List<dynamic>)
+          .map((e) => e as String)
+          .toList(),
       summary: json['summary'] as String,
       analysisDate: DateTime.parse(json['analysis_date'] as String),
       skillsComparison: json['skills_comparison'] as Map<String, dynamic>,
       searchabilityIssues: (json['searchability_issues'] as List<dynamic>)
           .map((e) => e as String)
           .toList(),
-      educationComparison: (json['educationComparison'] as List<dynamic>)
+      educationComparison: (json['education_comparison'] as List<dynamic>)
           .map((e) => e as String)
           .toList(),
-      experienceComparison: (json['experienceComparison'] as List<dynamic>)
+      experienceComparison: (json['experience_comparison'] as List<dynamic>)
           .map((e) => e as String)
           .toList(),
-      jobDescription: json['jobDescription'] as String,
+      jobDescription: json['job_description'] as String,
       recommendations: (json['recommendations'] as List<dynamic>)
           .map((e) => e as String)
           .toList(),
+      keywordMatchScore: json['keyword_match_score'] as int? ?? 0,
+      formattingScore: json['formatting_score'] as int? ?? 0,
+      contentScore: json['content_score'] as int? ?? 0,
+      readabilityScore: json['readability_score'] as int? ?? 0,
+      industry: json['industry'] as String? ?? 'General',
+      language: json['language'] as String? ?? 'en',
+      direction: json['direction'] as String? ?? 'ltr',
+      scoreBreakdown: (json['score_breakdown'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(k, e),
+          ) ??
+          const {},
+      identifiedSections: (json['identified_sections'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      missingSections: (json['missing_sections'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
+      analysisVersion: json['analysis_version'] as String? ?? '1.0',
     );
 
 Map<String, dynamic> _$AnalysisResultToJson(AnalysisResult instance) =>
@@ -36,11 +57,23 @@ Map<String, dynamic> _$AnalysisResultToJson(AnalysisResult instance) =>
       'score': instance.score,
       'keywords': instance.keywords,
       'summary': instance.summary,
-      'educationComparison': instance.educationComparison,
-      'experienceComparison': instance.experienceComparison,
-      'jobDescription': instance.jobDescription,
+      'education_comparison': instance.educationComparison,
+      'experience_comparison': instance.experienceComparison,
+      'job_description': instance.jobDescription,
       'recommendations': instance.recommendations,
       'analysis_date': instance.analysisDate.toIso8601String(),
       'skills_comparison': instance.skillsComparison,
       'searchability_issues': instance.searchabilityIssues,
+      'language': instance.language,
+      'direction': instance.direction,
+      'score_breakdown': instance.scoreBreakdown,
+      'keyword_match_score': instance.keywordMatchScore,
+      'formatting_score': instance.formattingScore,
+      'content_score': instance.contentScore,
+      'readability_score': instance.readabilityScore,
+      'industry': instance.industry,
+      'identified_sections': instance.identifiedSections,
+      'missing_sections': instance.missingSections,
+      'analysis_version': instance.analysisVersion,
     };
+    

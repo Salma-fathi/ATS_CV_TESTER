@@ -1,15 +1,28 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
 import uuid
-import itertools
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..errors import Errors
 from ..util import escape_html, minify_html, registry
-from .templates import TPL_DEP_ARCS, TPL_DEP_SVG, TPL_DEP_WORDS
-from .templates import TPL_DEP_WORDS_LEMMA, TPL_ENT, TPL_ENT_RTL, TPL_ENTS
-from .templates import TPL_FIGURE, TPL_KB_LINK, TPL_PAGE, TPL_SPAN
-from .templates import TPL_SPAN_RTL, TPL_SPAN_SLICE, TPL_SPAN_SLICE_RTL
-from .templates import TPL_SPAN_START, TPL_SPAN_START_RTL, TPL_SPANS
-from .templates import TPL_TITLE
+from .templates import (
+    TPL_DEP_ARCS,
+    TPL_DEP_SVG,
+    TPL_DEP_WORDS,
+    TPL_DEP_WORDS_LEMMA,
+    TPL_ENT,
+    TPL_ENT_RTL,
+    TPL_ENTS,
+    TPL_FIGURE,
+    TPL_KB_LINK,
+    TPL_PAGE,
+    TPL_SPAN,
+    TPL_SPAN_RTL,
+    TPL_SPAN_SLICE,
+    TPL_SPAN_SLICE_RTL,
+    TPL_SPAN_START,
+    TPL_SPAN_START_RTL,
+    TPL_SPANS,
+    TPL_TITLE,
+)
 
 DEFAULT_LANG = "en"
 DEFAULT_DIR = "ltr"
@@ -204,7 +217,7 @@ class SpanRenderer:
                     + (self.offset_step * (len(entities) - 1))
                 )
                 markup += self.span_template.format(
-                    text=token["text"],
+                    text=escape_html(token["text"]),
                     span_slices=slices,
                     span_starts=starts,
                     total_height=total_height,
@@ -300,6 +313,8 @@ class DependencyRenderer:
                 self.lang = settings.get("lang", DEFAULT_LANG)
             render_id = f"{id_prefix}-{i}"
             svg = self.render_svg(render_id, p["words"], p["arcs"])
+            if p.get("title"):
+                svg = TPL_TITLE.format(title=p.get("title")) + svg
             rendered.append(svg)
         if page:
             content = "".join([TPL_FIGURE.format(content=svg) for svg in rendered])
@@ -552,7 +567,7 @@ class EntityRenderer:
             for i, fragment in enumerate(fragments):
                 markup += escape_html(fragment)
                 if len(fragments) > 1 and i != len(fragments) - 1:
-                    markup += "</br>"
+                    markup += "<br>"
             if self.ents is None or label.upper() in self.ents:
                 color = self.colors.get(label.upper(), self.default_color)
                 ent_settings = {
@@ -570,7 +585,7 @@ class EntityRenderer:
         for i, fragment in enumerate(fragments):
             markup += escape_html(fragment)
             if len(fragments) > 1 and i != len(fragments) - 1:
-                markup += "</br>"
+                markup += "<br>"
         markup = TPL_ENTS.format(content=markup, dir=self.direction)
         if title:
             markup = TPL_TITLE.format(title=title) + markup

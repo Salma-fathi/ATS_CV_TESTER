@@ -89,14 +89,23 @@ def analyze_cv(text: str, job_description: Optional[str] = None, language: str =
             "keywords": unique_keywords[:KEYWORD_LIMIT],
             "summary": _get_localized_summary(top_keywords, len(unique_keywords), language),
             "analysis_date": datetime.now().isoformat(),
-            "skills_comparison": {},
+            "skills_comparison": {
+                "matching_keywords": [],
+                "missing_keywords": [],
+                "match_percentage": 0
+            },
             "searchability_issues": [],
             "education_comparison": [],
             "experience_comparison": [],
             "job_description": "",
             "recommendations": [],
             "language": language,
-            "direction": direction
+            "direction": direction,
+            "score_breakdown": {
+                "keyword_score": score,
+                "match_score": 0,
+                "format_score": _calculate_format_score(text, language)
+            }
         }
         
         # If job description is provided, perform comparison
@@ -117,7 +126,10 @@ def analyze_cv(text: str, job_description: Optional[str] = None, language: str =
                 
                 # Update score based on match percentage
                 match_score = analysis["skills_comparison"].get("match_percentage", 0)
-                analysis["score"] = int((score + match_score) / 2)  # Average of keyword score and match score
+                analysis["score_breakdown"]["match_score"] = match_score
+                
+                # Calculate final score as weighted average
+                analysis["score"] = int((score * 0.4) + (match_score * 0.4) + (analysis["score_breakdown"]["format_score"] * 0.2))
                 
                 # Generate searchability issues
                 missing_keywords = analysis["skills_comparison"].get("missing_keywords", [])
@@ -147,38 +159,35 @@ def analyze_cv(text: str, job_description: Optional[str] = None, language: str =
             # Use Gemini for enhanced analysis if available
             if gemini_handler:
                 try:
-                    # This would be implemented to use the Gemini handler for more advanced analysis
-                    # For now, we'll add placeholder data based on language
-                    if language == 'ar':
-                        analysis["education_comparison"] = [
-                            "درجة البكالوريوس المذكورة في السيرة الذاتية تتطابق مع متطلبات الوظيفة",
-                            "فكر في إضافة المزيد من التفاصيل حول الدورات الدراسية ذات الصلة"
-                        ]
+                    # Get structured data from Gemini analysis
+                    gemini_analysis = gemini_handler.analyze_resume(
+                        [text[:1000]],  # Send first 1000 chars as sample
+                        job_description,
+                        "analysis",
+                        language
+                    )
+                    
+                    if gemini_analysis and gemini_analysis.get("success", False):
+                        # Extract structured data from Gemini analysis
+                        structured_data = gemini_handler.extract_structured_data(
+                            gemini_analysis.get("content", ""),
+                            language
+                        )
                         
-                        analysis["experience_comparison"] = [
-                            "خبرتك تتوافق مع 70% من متطلبات الوظيفة",
-                            "فكر في تسليط الضوء على إنجازات محددة مع مقاييس"
-                        ]
-                        
-                        # Add more detailed recommendations
-                        analysis["recommendations"].append("استخدم أفعال نشطة في بداية نقاط الخبرة")
-                        analysis["recommendations"].append("قم بتحديد إنجازاتك بمقاييس محددة حيثما أمكن")
+                        # Update analysis with structured data
+                        for key in ["education_comparison", "experience_comparison", "recommendations"]:
+                            if key in structured_data and structured_data[key]:
+                                analysis[key] = structured_data[key]
                     else:
-                        analysis["education_comparison"] = [
-                            "Bachelor's degree mentioned in CV matches job requirements",
-                            "Consider adding more details about relevant coursework"
-                        ]
-                        
-                        analysis["experience_comparison"] = [
-                            "Your experience aligns with 70% of job requirements",
-                            "Consider highlighting specific achievements with metrics"
-                        ]
-                        
-                        # Add more detailed recommendations
-                        analysis["recommendations"].append("Use action verbs at the beginning of experience bullet points")
-                        analysis["recommendations"].append("Quantify achievements with specific metrics where possible")
+                        # Fallback to basic analysis if Gemini fails
+                        _add_fallback_analysis_data(analysis, language)
                 except Exception as e:
                     logger.error(f"Gemini analysis failed: {e}")
+                    # Fallback to basic analysis if Gemini fails
+                    _add_fallback_analysis_data(analysis, language)
+            else:
+                # Fallback to basic analysis if Gemini is not available
+                _add_fallback_analysis_data(analysis, language)
         else:
             # Basic recommendations without job description
             analysis["recommendations"] = text_analyzer.generate_recommendations(text)
@@ -194,6 +203,9 @@ def analyze_cv(text: str, job_description: Optional[str] = None, language: str =
                     "No job description provided for comparison",
                     "Upload with a job description for more specific analysis"
                 ]
+            
+            # Add basic education and experience analysis
+            _add_fallback_analysis_data(analysis, language)
         
         # Store the result
         results_store[analysis_id] = analysis
@@ -209,6 +221,77 @@ def analyze_cv(text: str, job_description: Optional[str] = None, language: str =
             "direction": "rtl" if language == 'ar' else "ltr"
         }
 
+def _calculate_format_score(text: str, language: str) -> int:
+    """Calculate a score for CV format and structure."""
+    score = 70  # Base score
+    
+    # Check for section headers
+    section_headers = {
+        'en': ['education', 'experience', 'skills', 'work', 'employment', 'qualification'],
+        'ar': ['التعليم', 'الخبرة', 'المهارات', 'العمل', 'التوظيف', 'المؤهلات']
+    }
+    
+    headers_found = 0
+    for header in section_headers.get(language, section_headers['en']):
+        if re.search(r'\b' + header + r'\b', text, re.IGNORECASE):
+            headers_found += 1
+    
+    # Adjust score based on headers found
+    if headers_found >= 3:
+        score += 20
+    elif headers_found >= 2:
+        score += 10
+    
+    # Check for bullet points
+    bullet_points = len(re.findall(r'•|\*|-|\u2022', text))
+    if bullet_points > 10:
+        score += 10
+    elif bullet_points > 5:
+        score += 5
+    
+    return min(score, 100)  # Cap at 100
+
+def _add_fallback_analysis_data(analysis: Dict[str, Any], language: str) -> None:
+    """Add fallback data for education and experience analysis when Gemini is not available."""
+    if language == 'ar':
+        if not analysis["education_comparison"]:
+            analysis["education_comparison"] = [
+                "تأكد من ذكر جميع المؤهلات التعليمية ذات الصلة",
+                "أضف تفاصيل حول الدورات والشهادات المتخصصة"
+            ]
+        
+        if not analysis["experience_comparison"]:
+            analysis["experience_comparison"] = [
+                "استخدم أفعال قوية لوصف مسؤولياتك وإنجازاتك",
+                "قم بتنظيم خبراتك بترتيب زمني عكسي (الأحدث أولاً)"
+            ]
+        
+        # Add more recommendations if needed
+        if len(analysis["recommendations"]) < 3:
+            analysis["recommendations"].extend([
+                "استخدم تنسيقًا متسقًا في جميع أنحاء سيرتك الذاتية",
+                "تأكد من أن معلومات الاتصال الخاصة بك محدثة وواضحة"
+            ])
+    else:
+        if not analysis["education_comparison"]:
+            analysis["education_comparison"] = [
+                "Ensure all relevant educational qualifications are mentioned",
+                "Add details about specialized courses and certifications"
+            ]
+        
+        if not analysis["experience_comparison"]:
+            analysis["experience_comparison"] = [
+                "Use strong action verbs to describe your responsibilities and achievements",
+                "Organize your experiences in reverse chronological order (most recent first)"
+            ]
+        
+        # Add more recommendations if needed
+        if len(analysis["recommendations"]) < 3:
+            analysis["recommendations"].extend([
+                "Use consistent formatting throughout your resume",
+                "Ensure your contact information is up-to-date and clear"
+            ])
+
 def _get_localized_summary(top_keywords: List[str], keyword_count: int, language: str) -> str:
     """Generate a localized summary based on language."""
     if language == 'ar':
@@ -222,49 +305,69 @@ def _get_localized_summary(top_keywords: List[str], keyword_count: int, language
 def analyze_endpoint():
     """API endpoint for CV analysis with multilingual support."""
     try:
-        # Check if file was uploaded
+        # Read the file content once to avoid stream issues
         if 'cv' not in request.files:
+            logger.warning("API Analyze: No 'cv' part in request.files. Aborting with 400.")
             return jsonify({"error": "No file uploaded"}), 400
         
         file = request.files['cv']
-        if file.filename == '':
+
+        if file.filename == "":
+            logger.warning("API Analyze: No file selected (empty filename). Aborting with 400.")
             return jsonify({"error": "No file selected"}), 400
             
         if not file_processor.allowed_file(file.filename):
+            logger.warning(f"API Analyze: Invalid file type for {file.filename}. Allowed: {ALLOWED_EXTENSIONS}. Aborting with 400.")
             return jsonify({"error": f"Invalid file type. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"}), 400
         
-        # Check file size
-        if not file_processor.check_file_size(file):
+        # Read the file content once to avoid stream issues
+        file_content_bytes = file.read()
+        # Reset the original FileStorage stream pointer
+        file.seek(0)
+
+        # Use BytesIO for size checking
+        file_stream_for_size_check = BytesIO(file_content_bytes)
+        if not file_processor.check_file_size(file_stream_for_size_check):
+            logger.warning(f"API Analyze: File size exceeded for {file.filename}. Limit: {MAX_FILE_SIZE // (1024 * 1024)}MB. Aborting with 400.")
             return jsonify({"error": f"File size exceeds {MAX_FILE_SIZE // (1024 * 1024)}MB limit"}), 400
 
-        # Process file
         filename = secure_filename(file.filename)
         
-        # Extract text and detect language
-        text, detected_language = file_processor.extract_text(file, filename)
+        # Use BytesIO for text extraction
+        file_stream_for_text_extraction = BytesIO(file_content_bytes)
+        text, detected_language = file_processor.extract_text(file_stream_for_text_extraction, filename)
         
         if not text:
+            logger.warning(f"API Analyze: Failed to extract text from file {filename}. Aborting with 400.")
             return jsonify({"error": "Failed to extract text from file"}), 400
         
+        logger.info(f"Successfully validated and extracted text from {filename}. Language: {detected_language}")
+        
         # Get language hint from request if provided
-        language_hint = request.form.get('language_hint', '')
+        language_hint = request.form.get("language_hint", "")
         
-        # Use language hint if provided, otherwise use detected language
-        language = language_hint if language_hint in ['en', 'ar'] else detected_language
+        # Use language hint if provided and valid, otherwise use detected language
+        language = language_hint if language_hint in ["en", "ar"] else detected_language
+        logger.info(f"Using language: {language} for analysis.")
             
-        # Get job description if provided
-        job_description = request.form.get('job_description')
+        job_description = request.form.get("job_description")
+        if job_description:
+            logger.info("Job description provided.")
+        else:
+            logger.info("No job description provided.")
         
-        # Analyze CV
         analysis = analyze_cv(text, job_description, language)
         
         if not analysis.get("success", True):
-            return jsonify({"error": analysis.get("error", "Analysis failed")}), 500
+            # This case should ideally return a 500 as it's an internal analysis failure
+            logger.error(f"API Analyze: Core analysis failed for {filename}. Error: {analysis.get('error', 'Unknown analysis error')}")
+            return jsonify({"error": analysis.get("error", "Analysis failed internally")}), 500
             
+        logger.info(f"API Analyze: Successfully analyzed {filename}. Returning 200.")
         return jsonify(analysis)
         
     except Exception as e:
-        logger.error(f"API Error: {e}")
+        logger.exception(f"API Analyze: Unhandled exception in /api/analyze endpoint.")
         return jsonify({
             "error": f"Internal server error: {str(e)}",
             "language": "en",
@@ -288,11 +391,12 @@ def health_check():
     """API endpoint for health check."""
     return jsonify({
         "status": "operational",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "timestamp": datetime.now().isoformat(),
         "features": {
             "multilingual": True,
-            "arabic_support": True
+            "arabic_support": True,
+            "detailed_analysis": gemini_handler is not None
         }
     })
 
@@ -301,7 +405,7 @@ def home():
     """Home endpoint with API information."""
     return jsonify({
         "status": "operational",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "supported_files": list(ALLOWED_EXTENSIONS),
         "max_size_mb": MAX_FILE_SIZE // (1024 * 1024),
         "supported_languages": ["en", "ar"],

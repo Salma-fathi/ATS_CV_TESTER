@@ -9,3 +9,7 @@ pdf2image==1.16.0
 pillow==8.3.2
 werkzeug==2.0.3
 flask-limiter==2.4.2
+flask-swagger-ui==5.21.0
+# spaCy models - ensure these versions are compatible with spacy==3.7.2
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.0/en_core_web_sm-3.7.0.tar.gz
+xx_ent_wiki_sm @ https://github.com/explosion/spacy-models/releases/download/xx_ent_wiki_sm-3.7.0/xx_ent_wiki_sm-3.7.0.tar.gz

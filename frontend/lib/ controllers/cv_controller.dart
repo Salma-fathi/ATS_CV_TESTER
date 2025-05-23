@@ -1,14 +1,13 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:frontend/utils/language_provider.dart/language_provider.dart';
 import '../ services/api_service.dart';
-import '../intl/language_provider.dart';
 import '../models/analysis_result.dart';
 import '../l10n/app_localizations.dart';
 
 class CvController extends ChangeNotifier {
   final ApiService apiService;
-  
+  final LanguageProvider languageProvider;
   // State variables
   bool _isLoading = false;
   String? _error;
@@ -24,7 +23,7 @@ class CvController extends ChangeNotifier {
   String? get jobDescription => _jobDescription;
   
   // Constructor
-  CvController({required this.apiService});
+  CvController({required this.apiService , required this.languageProvider});
   
   // Set job description
   void setJobDescription(String? description) {
@@ -38,11 +37,11 @@ class CvController extends ChangeNotifier {
       // Reset error state
       _error = null;
       
-      // Pick file
+      // Pick file with proper configuration for all platforms
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'docx'],
-        withData: true,
+        allowedExtensions: ['pdf', 'docx', 'txt'],
+        withData: true, // Important: Always get the bytes data for cross-platform compatibility
       );
       
       // Check if file was selected
@@ -52,6 +51,14 @@ class CvController extends ChangeNotifier {
       }
       
       _selectedFile = result.files.first;
+      
+      // Verify bytes are available (required by the API)
+      if (_selectedFile!.bytes == null || _selectedFile!.bytes!.isEmpty) {
+        _error = 'File data could not be loaded. Please try again or select a different file.';
+        notifyListeners();
+        return;
+      }
+      
       notifyListeners();
       
       // Analyze the CV
@@ -87,11 +94,18 @@ class CvController extends ChangeNotifier {
       return;
     }
     
+    // Verify bytes are available (required by the API)
+    if (_selectedFile!.bytes == null || _selectedFile!.bytes!.isEmpty) {
+      _error = 'File data could not be loaded. Please try again or select a different file.';
+      notifyListeners();
+      return;
+    }
+    
     _isLoading = true;
     notifyListeners();
     
     try {
-      // Call API service
+      // Call API service - the ApiService already handles bytes-based uploads
       final resultData = await apiService.analyzeCV(
         _selectedFile!,
         jobDescription: _jobDescription,
@@ -116,12 +130,10 @@ class CvController extends ChangeNotifier {
     notifyListeners();
   }
   
-  // Update language based on CV content
-  void updateLanguageBasedOnContent(BuildContext context) {
+  // Update language based on CV contents
+    void updateLanguageBasedOnContent() {
     if (_currentResult != null) {
-      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-      
-      // Set language based on result language
+      // Now using the injected languageProvider instead of Provider.of
       if (_currentResult!.isArabic && !languageProvider.isArabic) {
         languageProvider.setLocale(const Locale('ar', ''));
       } else if (!_currentResult!.isArabic && languageProvider.isArabic) {
@@ -147,6 +159,12 @@ class CvController extends ChangeNotifier {
       return appLocalizations.errorInvalidFile;
     } else if (_error!.contains('File size exceeds')) {
       return appLocalizations.errorFileSize;
+    } else if (_error!.contains('path') && _error!.contains('unavailable')) {
+      return 'File upload error: Please try again or use a different browser';
+    } else if (_error!.contains('File data could not be loaded')) {
+      return 'File data could not be loaded. Please try again or select a different file.';
+    } else if (_error!.contains('File is empty or corrupted')) {
+      return 'The selected file appears to be empty or corrupted. Please select a different file.';
     }
     
     // Default error message

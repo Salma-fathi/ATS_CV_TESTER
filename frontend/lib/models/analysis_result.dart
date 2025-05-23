@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:json_annotation/json_annotation.dart';
 
 part 'analysis_result.g.dart';
@@ -36,6 +37,38 @@ class AnalysisResult {
   @JsonKey(name: 'direction')
   final String direction;
 
+  // Added for detailed score breakdown
+  @JsonKey(name: 'score_breakdown')
+  final Map<String, dynamic>? scoreBreakdown;
+  
+  // Added for detailed component scores
+  @JsonKey(name: 'keyword_match_score')
+  final int keywordMatchScore;
+  
+  @JsonKey(name: 'formatting_score')
+  final int formattingScore;
+  
+  @JsonKey(name: 'content_score')
+  final int contentScore;
+  
+  @JsonKey(name: 'readability_score')
+  final int readabilityScore;
+  
+  // Added for industry information
+  @JsonKey(name: 'industry')
+  final String industry;
+  
+  // Added for section identification
+  @JsonKey(name: 'identified_sections')
+  final List<String> identifiedSections;
+  
+  @JsonKey(name: 'missing_sections')
+  final List<String> missingSections;
+  
+  // Added for version tracking
+  @JsonKey(name: 'analysis_version')
+  final String analysisVersion;
+
   AnalysisResult({
     required this.id,
     required this.score,
@@ -48,8 +81,17 @@ class AnalysisResult {
     required this.experienceComparison,
     required this.jobDescription,
     required this.recommendations,
+    required this.keywordMatchScore,
+    required this.formattingScore,
+    required this.contentScore,
+    required this.readabilityScore,
+    required this.industry,
     this.language = 'en',
     this.direction = 'ltr',
+    this.scoreBreakdown = const {},
+    this.identifiedSections = const [],
+    this.missingSections = const [],
+    this.analysisVersion = '1.0',
   });
 
   factory AnalysisResult.fromJson(Map<String, dynamic> json) {
@@ -67,6 +109,17 @@ class AnalysisResult {
       recommendations: _parseStringList(json['recommendations']),
       language: json['language'] as String? ?? _detectLanguage(json),
       direction: json['direction'] as String? ?? _detectDirection(json),
+      scoreBreakdown: (json['score_breakdown'] as Map<String, dynamic>?)?.map(
+        (k, e) => MapEntry(k, e),
+      ) ?? const {},
+      keywordMatchScore: json['keyword_match_score'] as int? ?? 0,
+      formattingScore: json['formatting_score'] as int? ?? 0,
+      contentScore: json['content_score'] as int? ?? 0,
+      readabilityScore: json['readability_score'] as int? ?? 0,
+      industry: json['industry'] as String? ?? 'General',
+      identifiedSections: _parseStringList(json['identified_sections']),
+      missingSections: _parseStringList(json['missing_sections']),
+      analysisVersion: json['analysis_version'] as String? ?? '1.0',
     );
   }
 
@@ -86,21 +139,51 @@ class AnalysisResult {
 
   // Helper method to safely parse skills comparison
   static Map<String, dynamic> _parseSkillsComparison(dynamic value) {
-    if (value == null) return {};
+    if (value == null) return {
+      'matching_keywords': <String>[],
+      'missing_keywords': <String>[],
+      'match_percentage': 0.0
+    };
     
     if (value is Map) {
-      return Map<String, dynamic>.from(value);
+      // Ensure the map has all required keys with default values
+      Map<String, dynamic> result = Map<String, dynamic>.from(value);
+      
+      // Set defaults for missing keys
+      if (!result.containsKey('matching_keywords')) {
+        result['matching_keywords'] = <String>[];
+      } else if (result['matching_keywords'] is! List) {
+        result['matching_keywords'] = <String>[];
+      }
+      
+      if (!result.containsKey('missing_keywords')) {
+        result['missing_keywords'] = <String>[];
+      } else if (result['missing_keywords'] is! List) {
+        result['missing_keywords'] = <String>[];
+      }
+      
+      if (!result.containsKey('match_percentage')) {
+        result['match_percentage'] = 0.0;
+      } else if (result['match_percentage'] is int) {
+        result['match_percentage'] = (result['match_percentage'] as int).toDouble();
+      }
+      
+      return result;
     } else if (value is String) {
       // If it's a string (unlikely but handling edge case)
-      try {
-        // This is a simplification - in real code you might use json.decode
-        return {'message': value};
-      } catch (e) {
-        return {'message': value};
-      }
+      return {
+        'message': value,
+        'matching_keywords': <String>[],
+        'missing_keywords': <String>[],
+        'match_percentage': 0.0
+      };
     }
     
-    return {};
+    return {
+      'matching_keywords': <String>[],
+      'missing_keywords': <String>[],
+      'match_percentage': 0.0
+    };
   }
 
   // Helper method to parse job description
@@ -163,6 +246,15 @@ class AnalysisResult {
       'analysis_date': analysisDate.toIso8601String(),
       'language': language,
       'direction': direction,
+      'score_breakdown': scoreBreakdown,
+      'keyword_match_score': keywordMatchScore,
+      'formatting_score': formattingScore,
+      'content_score': contentScore,
+      'readability_score': readabilityScore,
+      'industry': industry,
+      'identified_sections': identifiedSections,
+      'missing_sections': missingSections,
+      'analysis_version': analysisVersion,
     };
   }
   
@@ -171,4 +263,122 @@ class AnalysisResult {
   
   // Check if content should be displayed RTL
   bool get isRtl => direction == 'rtl';
+
+  // Get score rating based on score value
+  String getScoreRating(dynamic localizations) {
+    if (score >= 80) {
+      return localizations.excellent;
+    } else if (score >= 60) {
+      return localizations.good;
+    } else {
+      return localizations.needsImprovement;
+    }
+  }
+
+  // Get score color based on score value
+  Color getScoreColor() {
+    if (score >= 80) {
+      return Colors.green;
+    } else if (score >= 60) {
+      return Colors.orange;
+    } else {
+      return Colors.red;
+    }
+  }
+
+  // Check if the result has detailed education comparison
+  bool get hasEducationComparison => educationComparison.isNotEmpty;
+
+  // Check if the result has detailed experience comparison
+  bool get hasExperienceComparison => experienceComparison.isNotEmpty;
+
+  // Check if the result has job description
+  bool get hasJobDescription => jobDescription.isNotEmpty;
+
+  // Check if the result has recommendations
+  bool get hasRecommendations => recommendations.isNotEmpty;
+
+  // Check if the result has searchability issues
+  bool get hasSearchabilityIssues => searchabilityIssues.isNotEmpty;
+
+  // Check if the result has skills comparison
+  bool get hasSkillsComparison => 
+    skillsComparison.isNotEmpty && 
+    (skillsComparison['matching_keywords'] != null || 
+     skillsComparison['missing_keywords'] != null);
+
+  // Check if the result has identified sections
+  bool get hasIdentifiedSections => identifiedSections.isNotEmpty;
+
+  // Check if the result has missing sections
+  bool get hasMissingSections => missingSections.isNotEmpty;
+
+  // Get matching keywords safely
+  List<String> get matchingKeywords {
+    if (!hasSkillsComparison) return [];
+    
+    final keywords = skillsComparison['matching_keywords'];
+    if (keywords == null) return [];
+    
+    if (keywords is List) {
+      return keywords.map((item) => item.toString()).toList();
+    }
+    
+    return [];
+  }
+
+  // Get missing keywords safely
+  List<String> get missingKeywords {
+    if (!hasSkillsComparison) return [];
+    
+    final keywords = skillsComparison['missing_keywords'];
+    if (keywords == null) return [];
+    
+    if (keywords is List) {
+      return keywords.map((item) => item.toString()).toList();
+    }
+    
+    return [];
+  }
+
+  // Get match percentage safely
+  double get matchPercentage {
+    if (!hasSkillsComparison) return 0.0;
+    
+    final percentage = skillsComparison['match_percentage'];
+    if (percentage == null) return 0.0;
+    
+    if (percentage is double) {
+      return percentage;
+    } else if (percentage is int) {
+      return percentage.toDouble();
+    }
+    
+    return 0.0;
+  }
+
+  // Get component scores as a map
+  Map<String, int> get componentScores {
+    return {
+      'Keyword Match': keywordMatchScore,
+      'Formatting': formattingScore,
+      'Content': contentScore,
+      'Readability': readabilityScore,
+    };
+  }
+
+  // Calculate weighted score based on component scores
+  int calculateWeightedScore({
+    double keywordWeight = 0.4,
+    double formattingWeight = 0.2,
+    double contentWeight = 0.3,
+    double readabilityWeight = 0.1,
+  }) {
+    return (
+      keywordMatchScore * keywordWeight +
+      formattingScore * formattingWeight +
+      contentScore * contentWeight +
+      readabilityScore * readabilityWeight
+    ).round();
+  }
 }
