@@ -95,12 +95,74 @@ class AnalysisResult {
   });
 
   factory AnalysisResult.fromJson(Map<String, dynamic> json) {
+    // Extract scores from score_breakdown if available
+    Map<String, dynamic>? scoreBreakdown = json['score_breakdown'] as Map<String, dynamic>?;
+    
+    // Default score to use if no other source is available
+    int defaultScore = (json['score'] as int?) ?? 70;
+    
+    // Extract keyword match score with fallbacks
+    int keywordMatchScore = 0;
+    if (scoreBreakdown != null && scoreBreakdown['keyword_score'] != null) {
+      keywordMatchScore = scoreBreakdown['keyword_score'] as int;
+    } else if (json['keyword_match_score'] != null) {
+      keywordMatchScore = json['keyword_match_score'] as int;
+    } else {
+      // Fallback to a percentage of the overall score
+      keywordMatchScore = (defaultScore * 0.8).round();
+    }
+    
+    // Extract formatting score with fallbacks
+    int formattingScore = 0;
+    if (scoreBreakdown != null && scoreBreakdown['format_score'] != null) {
+      formattingScore = scoreBreakdown['format_score'] as int;
+    } else if (json['formatting_score'] != null) {
+      formattingScore = json['formatting_score'] as int;
+    } else {
+      // Fallback to a percentage of the overall score
+      formattingScore = (defaultScore * 0.85).round();
+    }
+    
+    // Extract content score with fallbacks
+    int contentScore = 0;
+    if (scoreBreakdown != null && scoreBreakdown['content_score'] != null) {
+      contentScore = scoreBreakdown['content_score'] as int;
+    } else if (json['content_score'] != null) {
+      contentScore = json['content_score'] as int;
+    } else {
+      // Fallback to a percentage of the overall score
+      contentScore = (defaultScore * 0.75).round();
+    }
+    
+    // Extract readability score with fallbacks
+    int readabilityScore = 0;
+    if (scoreBreakdown != null && scoreBreakdown['readability_score'] != null) {
+      readabilityScore = scoreBreakdown['readability_score'] as int;
+    } else if (json['readability_score'] != null) {
+      readabilityScore = json['readability_score'] as int;
+    } else {
+      // Fallback to a percentage of the overall score
+      readabilityScore = (defaultScore * 0.9).round();
+    }
+    
+    // If overall score is 0 but component scores are not, calculate a weighted average
+    int overallScore = json['score'] as int? ?? 0;
+    if (overallScore == 0 && (keywordMatchScore > 0 || formattingScore > 0 || 
+                             contentScore > 0 || readabilityScore > 0)) {
+      overallScore = ((keywordMatchScore * 0.4) + 
+                      (formattingScore * 0.2) + 
+                      (contentScore * 0.3) + 
+                      (readabilityScore * 0.1)).round();
+    }
+    
     return AnalysisResult(
-      id: json['id'] as String,
-      score: json['score'] as int,
+      id: json['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      score: overallScore,
       keywords: _parseStringList(json['keywords']),
       summary: json['summary'] as String? ?? 'No summary available',
-      analysisDate: DateTime.parse(json['analysis_date'] as String),
+      analysisDate: json['analysis_date'] != null 
+          ? DateTime.parse(json['analysis_date'] as String)
+          : DateTime.now(),
       skillsComparison: _parseSkillsComparison(json['skills_comparison']),
       searchabilityIssues: _parseStringList(json['searchability_issues']),
       educationComparison: _parseStringList(json['education_comparison']),
@@ -109,13 +171,13 @@ class AnalysisResult {
       recommendations: _parseStringList(json['recommendations']),
       language: json['language'] as String? ?? _detectLanguage(json),
       direction: json['direction'] as String? ?? _detectDirection(json),
-      scoreBreakdown: (json['score_breakdown'] as Map<String, dynamic>?)?.map(
+      scoreBreakdown: scoreBreakdown?.map(
         (k, e) => MapEntry(k, e),
       ) ?? const {},
-      keywordMatchScore: json['keyword_match_score'] as int? ?? 0,
-      formattingScore: json['formatting_score'] as int? ?? 0,
-      contentScore: json['content_score'] as int? ?? 0,
-      readabilityScore: json['readability_score'] as int? ?? 0,
+      keywordMatchScore: keywordMatchScore,
+      formattingScore: formattingScore,
+      contentScore: contentScore,
+      readabilityScore: readabilityScore,
       industry: json['industry'] as String? ?? 'General',
       identifiedSections: _parseStringList(json['identified_sections']),
       missingSections: _parseStringList(json['missing_sections']),
@@ -380,5 +442,10 @@ class AnalysisResult {
       contentScore * contentWeight +
       readabilityScore * readabilityWeight
     ).round();
+  }
+  
+  // Add the missing keywordMatches method
+  bool keywordMatches(String keyword) {
+    return matchingKeywords.contains(keyword);
   }
 }

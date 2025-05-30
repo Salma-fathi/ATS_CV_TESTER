@@ -29,11 +29,11 @@ AnalysisResult _$AnalysisResultFromJson(Map<String, dynamic> json) =>
       recommendations: (json['recommendations'] as List<dynamic>)
           .map((e) => e as String)
           .toList(),
-      keywordMatchScore: json['keyword_match_score'] as int? ?? 0,
-      formattingScore: json['formatting_score'] as int? ?? 0,
-      contentScore: json['content_score'] as int? ?? 0,
-      readabilityScore: json['readability_score'] as int? ?? 0,
-      industry: json['industry'] as String? ?? 'General',
+      keywordMatchScore: json['keyword_match_score'] as int,
+      formattingScore: json['formatting_score'] as int,
+      contentScore: json['content_score'] as int,
+      readabilityScore: json['readability_score'] as int,
+      industry: json['industry'] as String,
       language: json['language'] as String? ?? 'en',
       direction: json['direction'] as String? ?? 'ltr',
       scoreBreakdown: (json['score_breakdown'] as Map<String, dynamic>?)?.map(

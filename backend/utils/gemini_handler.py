@@ -1,6 +1,6 @@
 # backend/utils/gemini_handler.py
-
 import os
+
 import google.generativeai as genai
 import logging
 from typing import Optional, Dict, Any, List

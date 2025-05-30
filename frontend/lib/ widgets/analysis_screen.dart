@@ -1,812 +1,1432 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart' show DateFormat;
+import 'package:frontend/%20widgets/keyword_chip.dart';
+import 'package:frontend/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
-import '../ controllers/result_controller.dart';
-import '../l10n/app_localizations.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
+import 'dart:ui' as ui;
+import 'package:intl/intl.dart';
+import '../ controllers/cv_controller.dart';
 import '../models/analysis_result.dart';
-import '../utils/language_provider.dart/language_provider.dart';
+import 'score_indicator.dart';
 
 class AnalysisScreen extends StatefulWidget {
-  final String cvId;
-
-  const AnalysisScreen({super.key, required this.cvId});
+  const AnalysisScreen({Key? key}) : super(key: key);
 
   @override
-  State<AnalysisScreen> createState() => _AnalysisScreenState();
+  _AnalysisScreenState createState() => _AnalysisScreenState();
 }
 
-class _AnalysisScreenState extends State<AnalysisScreen> {
+// Using TickerProviderStateMixin to support multiple animation controllers
+class _AnalysisScreenState extends State<AnalysisScreen> with TickerProviderStateMixin {
+  late TabController _tabController;
+  int _retryCount = 0;
+  final int _maxRetries = 3;
+  Timer? _retryTimer;
+  bool _isRetrying = false;
+  
+  // Animation controllers for score animations
+  late AnimationController _scoreAnimationController;
+  late Animation<double> _scoreAnimation;
+
   @override
   void initState() {
     super.initState();
-    // Load result when screen initializes if ID is provided
-    if (widget.cvId.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.read<ResultController>().loadResult(widget.cvId);
-      });
+    _tabController = TabController(length: 4, vsync: this); // Updated to 4 tabs to include Score Breakdown
+    
+    // Initialize score animation controller
+    _scoreAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _retryTimer?.cancel();
+    _scoreAnimationController.dispose();
+    super.dispose();
+  }
+
+  // Retry logic with exponential backoff
+  void _retryAnalysis(CvController controller) {
+    if (_retryCount >= _maxRetries) {
+      // Max retries reached, stop trying
+      return;
     }
+
+    setState(() {
+      _isRetrying = true;
+    });
+
+    // Calculate backoff time (2^retry_count * 1000ms)
+    final backoffMs = (1 << _retryCount) * 1000;
+    
+    _retryTimer = Timer(Duration(milliseconds: backoffMs), () {
+      if (mounted) {
+        setState(() {
+          _retryCount++;
+        });
+        controller.retryAnalysis();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.watch<ResultController>();
-    final languageProvider = Provider.of<LanguageProvider>(context);
     final appLocalizations = AppLocalizations.of(context);
-    final screenSize = MediaQuery.of(context).size;
-    final isDesktop = screenSize.width > 768;
-
-    // If result is loaded and has content, update language based on result content
-    if (controller.result != null && !controller.isLoading) {
-      // Use the language from the result to update the app language
-      if (controller.result!.isArabic && !languageProvider.isArabic) {
-        // Only update if there's a mismatch to avoid infinite rebuilds
-        Future.microtask(() => 
-          languageProvider.setLocale(const Locale('ar', '')));
-      } else if (!controller.result!.isArabic && languageProvider.isArabic) {
-        Future.microtask(() => 
-          languageProvider.setLocale(const Locale('en', '')));
-      }
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(appLocalizations.analysisResults),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: widget.cvId.isNotEmpty 
-                ? () => controller.loadResult(widget.cvId)
-                : null,
-            tooltip: appLocalizations.retry,
+    
+    return Consumer<CvController>(
+      builder: (context, controller, child) {
+        // Update language based on CV content if result is available
+        if (controller.currentResult != null) {
+        }
+        
+        // Determine text direction based on current locale or CV content
+        final ui.TextDirection textDirection = controller.currentResult?.isRtl == true 
+            ? ui.TextDirection.rtl 
+            : Localizations.localeOf(context).languageCode == 'ar' 
+                ? ui.TextDirection.rtl 
+                : ui.TextDirection.ltr;
+        
+        return Directionality(
+          textDirection: textDirection,
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(
+                appLocalizations.analysisResults,
+                style: GoogleFonts.montserrat(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              centerTitle: true,
+              elevation: 0,
+              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.8),
+              leading: IconButton(
+                icon: Icon(Icons.arrow_back_ios_new, color: Theme.of(context).colorScheme.onPrimary),
+                onPressed: () => Navigator.pop(context),
+              ),
+              actions: [
+                // Export button
+                IconButton(
+                  icon: Icon(Icons.download, color: Theme.of(context).colorScheme.onPrimary),
+                  onPressed: controller.currentResult != null ? () {
+                    // Implement export functionality
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(appLocalizations.exportSuccess))
+                    );
+                  } : null,
+                  tooltip: appLocalizations.export,
+                ),
+              ],
+            ),
+            body: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Theme.of(context).primaryColor.withOpacity(0.8),
+                    Theme.of(context).scaffoldBackgroundColor,
+                  ],
+                ),
+              ),
+              child: _buildContent(controller, appLocalizations),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: controller.result != null 
-                ? () => _exportResults(controller)
-                : null,
-            tooltip: appLocalizations.export,
-          ),
-        ],
-      ),
-      body: _buildContent(controller, isDesktop, appLocalizations, languageProvider),
+        );
+      },
     );
   }
 
-  Widget _buildContent(ResultController controller, bool isDesktop, AppLocalizations appLocalizations, LanguageProvider languageProvider) {
+  Widget _buildContent(CvController controller, AppLocalizations appLocalizations) {
     if (controller.isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 20),
-            Text(appLocalizations.loadingResults),
-          ],
-        ),
-      );
+      return _buildLoadingState(appLocalizations);
+    } else if (controller.error != null) {
+      return _buildErrorState(controller, appLocalizations);
+    } else if (controller.currentResult == null) {
+      return _buildNoResultState(appLocalizations);
+    } else {
+      return _buildResultsView(controller, appLocalizations);
     }
+  }
 
-    if (controller.error != null) {
-      return Center(
+  Widget _buildLoadingState(AppLocalizations appLocalizations) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Custom loading animation
+          SizedBox(
+            width: 100,
+            height: 100,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
+                    strokeWidth: 4,
+                  ),
+                ),
+                Icon(
+                  Icons.description_outlined,
+                  size: 40,
+                  color: Theme.of(context).primaryColor,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            appLocalizations.loadingResults,
+            style: GoogleFonts.montserrat(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(CvController controller, AppLocalizations appLocalizations) {
+    // Get localized error message
+    String errorMessage = controller.getLocalizedError(context);
+    
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 50),
-            const SizedBox(height: 20),
-            Text(controller.error!),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: widget.cvId.isNotEmpty 
-                  ? () => controller.loadResult(widget.cvId)
-                  : null,
-              child: Text(appLocalizations.retry),
-            )
-          ],
-        ),
-      );
-    }
-
-    if (controller.result == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.search_off, color: Colors.grey, size: 50),
-            const SizedBox(height: 20),
-            Text(appLocalizations.noResultsFound),
-            const SizedBox(height: 10),
+            // Error icon
+            Icon(
+              Icons.error_outline,
+              size: 80,
+              color: Colors.red,
+            ),
+            const SizedBox(height: 24),
             Text(
-              appLocalizations.uploadToSeeResults,
+              'Error',
+              style: GoogleFonts.montserrat(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 16),
+            Text(
+              errorMessage,
+              style: GoogleFonts.roboto(
+                fontSize: 16,
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Try again button
+                ElevatedButton.icon(
+                  icon: Icon(_isRetrying ? Icons.cancel : Icons.refresh),
+                  label: Text(
+                    appLocalizations.retry,
+                    style: GoogleFonts.montserrat(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isRetrying ? Colors.grey : Theme.of(context).primaryColor,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  onPressed: () {
+                    if (_isRetrying) {
+                      // Cancel retry
+                      setState(() {
+                        _isRetrying = false;
+                        _retryCount = 0;
+                      });
+                      _retryTimer?.cancel();
+                    } else {
+                      // Start retry with exponential backoff
+                      _retryAnalysis(controller);
+                    }
+                  },
+                ),
+                const SizedBox(width: 16),
+                // Go back button
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.arrow_back),
+                  label: Text(
+                    'Go Back',
+                    style: GoogleFonts.montserrat(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).textTheme.bodyLarge?.color,
+                    side: BorderSide(color: Theme.of(context).dividerColor),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+            ),
           ],
         ),
-      );
-    }
-
-    return _buildAnalysisReport(controller.result!, isDesktop, appLocalizations, languageProvider);
+      ),
+    );
   }
 
-  Widget _buildAnalysisReport(AnalysisResult result, bool isDesktop, AppLocalizations appLocalizations, LanguageProvider languageProvider) {
-    final isRtl = result.isRtl || languageProvider.isArabic;
+  Widget _buildNoResultState(AppLocalizations appLocalizations) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off,
+            size: 80,
+            color: Theme.of(context).textTheme.bodyMedium?.color,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            appLocalizations.noResultsFound,
+            style: GoogleFonts.montserrat(
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              appLocalizations.uploadToSeeResults,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.roboto(
+                fontSize: 16,
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+                height: 1.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.upload_file),
+            label: Text(
+              'Upload CV',
+              style: GoogleFonts.montserrat(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultsView(CvController controller, AppLocalizations appLocalizations) {
+    final result = controller.currentResult!;
     
-    if (isDesktop) {
-      // Desktop layout - two column
-      return Row(
+    // Set up score animation if not already done
+    if (!_scoreAnimationController.isAnimating && !_scoreAnimationController.isCompleted) {
+      _scoreAnimation = Tween<double>(
+        begin: 0.0,
+        end: result.score.toDouble(),
+      ).animate(CurvedAnimation(
+        parent: _scoreAnimationController,
+        curve: Curves.easeOutCubic,
+      ));
+      
+      _scoreAnimationController.forward();
+    }
+    
+    return Column(
+      children: [
+        // Tab bar
+        TabBar(
+          controller: _tabController,
+          indicatorColor: Theme.of(context).primaryColor,
+          indicatorWeight: 3,
+          labelColor: Theme.of(context).primaryColor,
+          unselectedLabelColor: Theme.of(context).textTheme.bodyMedium?.color,
+          labelStyle: GoogleFonts.montserrat(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: GoogleFonts.montserrat(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+          tabs: [
+            Tab(text: appLocalizations.summary.toUpperCase()),
+            Tab(text: appLocalizations.skillsComparison.toUpperCase()),
+            Tab(text: appLocalizations.recommendations.toUpperCase()),
+            Tab(text: appLocalizations.scoreBreakdown.toUpperCase()),
+          ],
+        ),
+        
+        // Tab content
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              // Summary tab
+              _buildSummaryTab(result, appLocalizations),
+              
+              // Skills Comparison tab
+              _buildSkillsComparisonTab(result, appLocalizations),
+              
+              // Recommendations tab
+              _buildRecommendationsTab(result, appLocalizations),
+              
+              // Score Breakdown tab (new)
+              _buildScoreBreakdownTab(result, appLocalizations),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryTab(AnalysisResult result, AppLocalizations appLocalizations) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left column - 40% width
-          Expanded(
-            flex: 4,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+          // Score indicator
+          Center(
+            child: AnimatedBuilder(
+              animation: _scoreAnimationController,
+              builder: (context, child) {
+                return ScoreIndicator(
+                  score: _scoreAnimation.value.round().toDouble(),
+                  size: 150,
+                  strokeWidth: 12,
+                  textStyle: GoogleFonts.montserrat(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: result.getScoreColor(),
+                  ),
+                  labelStyle: GoogleFonts.montserrat(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                  ),
+                  label: result.getScoreRating(appLocalizations),
+                );
+              },
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // Summary card
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
               child: Column(
-                crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildScoreCard(result, appLocalizations, isRtl),
-                  const SizedBox(height: 20),
-                  _buildSection(appLocalizations.summary, result.summary, isRtl),
-                  const SizedBox(height: 20),
-                  _buildKeywordSection(result.keywords, appLocalizations, isRtl),
-                  const SizedBox(height: 20),
-                  _buildDateSection(result.analysisDate, appLocalizations, isRtl),
-                  const SizedBox(height: 20),
-                  if (result.hasSearchabilityIssues)
-                    _buildSearchabilityIssues(result.searchabilityIssues, appLocalizations, isRtl),
+                  Text(
+                    appLocalizations.summary,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    result.summary,
+                    style: GoogleFonts.roboto(
+                      fontSize: 16,
+                      height: 1.5,
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-          // Right column - 60% width
-          Expanded(
-            flex: 6,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+          
+          const SizedBox(height: 16),
+          
+          // Key skills
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
               child: Column(
-                crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (result.hasJobDescription) ...[
-                    _buildJobDescription(result.jobDescription, appLocalizations, isRtl),
-                    const SizedBox(height: 20),
-                  ],
-                  if (result.hasSkillsComparison) ...[
-                    _buildSkillsComparison(result, appLocalizations, isRtl),
-                    const SizedBox(height: 20),
-                  ],
-                  if (result.hasEducationComparison) ...[
-                    _buildEducationComparison(result.educationComparison, appLocalizations, isRtl),
-                    const SizedBox(height: 20),
-                  ],
-                  if (result.hasExperienceComparison) ...[
-                    _buildExperienceComparison(result.experienceComparison, appLocalizations, isRtl),
-                    const SizedBox(height: 20),
-                  ],
-                  if (result.hasRecommendations)
-                    _buildRecommendations(result.recommendations, appLocalizations, isRtl),
+                  Text(
+                    appLocalizations.keySkills,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: result.keywords.map((keyword) {
+                      return KeywordChip(
+                        keyword: keyword,
+                        isMatched: result.matchingKeywords.contains(keyword),
+                      );
+                    }).toList(),
+                  ),
                 ],
               ),
             ),
           ),
-        ],
-      );
-    } else {
-      // Mobile layout - single column
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildScoreCard(result, appLocalizations, isRtl),
-          const SizedBox(height: 20),
-          _buildSection(appLocalizations.summary, result.summary, isRtl),
-          const SizedBox(height: 20),
-          _buildKeywordSection(result.keywords, appLocalizations, isRtl),
-          const SizedBox(height: 20),
-          _buildDateSection(result.analysisDate, appLocalizations, isRtl),
-          const SizedBox(height: 20),
-          if (result.hasJobDescription) ...[
-            _buildJobDescription(result.jobDescription, appLocalizations, isRtl),
-            const SizedBox(height: 20),
-          ],
-          if (result.hasSkillsComparison) ...[
-            _buildSkillsComparison(result, appLocalizations, isRtl),
-            const SizedBox(height: 20),
-          ],
-          if (result.hasEducationComparison) ...[
-            _buildEducationComparison(result.educationComparison, appLocalizations, isRtl),
-            const SizedBox(height: 20),
-          ],
-          if (result.hasExperienceComparison) ...[
-            _buildExperienceComparison(result.experienceComparison, appLocalizations, isRtl),
-            const SizedBox(height: 20),
-          ],
-          if (result.hasRecommendations) ...[
-            _buildRecommendations(result.recommendations, appLocalizations, isRtl),
-            const SizedBox(height: 20),
-          ],
-          if (result.hasSearchabilityIssues)
-            _buildSearchabilityIssues(result.searchabilityIssues, appLocalizations, isRtl),
-        ],
-      );
-    }
-  }
-
-  Widget _buildDateSection(DateTime date, AppLocalizations appLocalizations, bool isRtl) {
-    final formattedDate = DateFormat('dd/MM/yyyy HH:mm').format(date);
-    
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Row(
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              children: [
-                const Icon(Icons.calendar_today, color: Colors.blue),
-                const SizedBox(width: 8),
-                Text(
-                  appLocalizations.version,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
+          
+          const SizedBox(height: 16),
+          
+          // Analysis date
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-            const Divider(),
-            const SizedBox(height: 10),
-            Text(
-              formattedDate,
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              textAlign: isRtl ? TextAlign.right : TextAlign.left,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildJobDescription(String jobDescription, AppLocalizations appLocalizations, bool isRtl) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Row(
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              children: [
-                const Icon(Icons.description, color: Colors.blue),
-                const SizedBox(width: 8),
-                Text(
-                  appLocalizations.jobDescription,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const Divider(),
-            const SizedBox(height: 10),
-            Text(
-              jobDescription,
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              textAlign: isRtl ? TextAlign.right : TextAlign.left,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSkillsComparison(AnalysisResult result, AppLocalizations appLocalizations, bool isRtl) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Row(
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              children: [
-                const Icon(Icons.compare_arrows, color: Colors.blue),
-                const SizedBox(width: 8),
-                Text(
-                  appLocalizations.skillsComparison,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const Divider(),
-            const SizedBox(height: 10),
-            
-            // Match percentage indicator
-            LinearProgressIndicator(
-              value: result.matchPercentage / 100,
-              backgroundColor: Colors.grey[200],
-              color: _getMatchColor(result.matchPercentage),
-              minHeight: 10,
-            ),
-            const SizedBox(height: 5),
-            Text(
-              '${appLocalizations.match}: ${result.matchPercentage.toStringAsFixed(1)}%',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              textAlign: isRtl ? TextAlign.right : TextAlign.left,
-            ),
-            const SizedBox(height: 15),
-            
-            // Matching skills
-            Text(
-              '${appLocalizations.matchingSkills}:',
-              style: const TextStyle(fontWeight: FontWeight.w500),
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              textAlign: isRtl ? TextAlign.right : TextAlign.left,
-            ),
-            const SizedBox(height: 5),
-            if (result.matchingKeywords.isEmpty)
-              Text(
-                appLocalizations.noMatchingSkills,
-                // Use TextDirection directly as an enum value
-                textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                textAlign: isRtl ? TextAlign.right : TextAlign.left,
-              )
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                // Use TextDirection directly as an enum value
-                textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                children: result.matchingKeywords
-                    .map((skill) => Chip(
-                          label: Text(
-                            skill,
-                            // Use TextDirection directly as an enum value
-                            textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                          ),
-                          backgroundColor: Colors.green[100],
-                          avatar: const Icon(Icons.check, color: Colors.green, size: 16),
-                        ))
-                    .toList(),
-              ),
-            const SizedBox(height: 15),
-            
-            // Missing skills
-            Text(
-              '${appLocalizations.missingSkills}:',
-              style: const TextStyle(fontWeight: FontWeight.w500),
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              textAlign: isRtl ? TextAlign.right : TextAlign.left,
-            ),
-            const SizedBox(height: 5),
-            if (result.missingKeywords.isEmpty)
-              Text(
-                appLocalizations.greatMatch,
-                // Use TextDirection directly as an enum value
-                textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                textAlign: isRtl ? TextAlign.right : TextAlign.left,
-              )
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                // Use TextDirection directly as an enum value
-                textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                children: result.missingKeywords
-                    .map((skill) => Chip(
-                          label: Text(
-                            skill,
-                            // Use TextDirection directly as an enum value
-                            textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                          ),
-                          backgroundColor: Colors.red[50],
-                          avatar: const Icon(Icons.close, color: Colors.red, size: 16),
-                        ))
-                    .toList(),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEducationComparison(List<String> education, AppLocalizations appLocalizations, bool isRtl) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Row(
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              children: [
-                const Icon(Icons.school, color: Colors.blue),
-                const SizedBox(width: 8),
-                Text(
-                  appLocalizations.educationComparison,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const Divider(),
-            const SizedBox(height: 10),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: education.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Row(
-                    // Use TextDirection directly as an enum value
-                    textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appLocalizations.version,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
                     children: [
-                      const Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
+                      Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: Theme.of(context).textTheme.bodyMedium?.color,
+                      ),
                       const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          education[index],
-                          // Use TextDirection directly as an enum value
-                          textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                          textAlign: isRtl ? TextAlign.right : TextAlign.left,
+                      Text(
+                        DateFormat('MMMM d, yyyy').format(result.analysisDate),
+                        style: GoogleFonts.roboto(
+                          fontSize: 16,
                         ),
                       ),
                     ],
                   ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExperienceComparison(List<String> experience, AppLocalizations appLocalizations, bool isRtl) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Row(
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              children: [
-                const Icon(Icons.work, color: Colors.blue),
-                const SizedBox(width: 8),
-                Text(
-                  appLocalizations.experienceComparison,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const Divider(),
-            const SizedBox(height: 10),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: experience.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Row(
-                    // Use TextDirection directly as an enum value
-                    textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          experience[index],
-                          // Use TextDirection directly as an enum value
-                          textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                          textAlign: isRtl ? TextAlign.right : TextAlign.left,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecommendations(List<String> recommendations, AppLocalizations appLocalizations, bool isRtl) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Row(
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              children: [
-                const Icon(Icons.lightbulb, color: Colors.amber),
-                const SizedBox(width: 8),
-                Text(
-                  appLocalizations.recommendations,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const Divider(),
-            const SizedBox(height: 10),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: recommendations.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Row(
-                    // Use TextDirection directly as an enum value
-                    textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.arrow_right, color: Colors.blue),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          recommendations[index],
-                          // Use TextDirection directly as an enum value
-                          textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                          textAlign: isRtl ? TextAlign.right : TextAlign.left,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchabilityIssues(List<String> issues, AppLocalizations appLocalizations, bool isRtl) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Row(
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              children: [
-                const Icon(Icons.warning_amber, color: Colors.orange),
-                const SizedBox(width: 8),
-                Text(
-                  appLocalizations.searchabilityIssues,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const Divider(),
-            const SizedBox(height: 10),
-            if (issues.isEmpty)
-              Text(
-                appLocalizations.noIssuesFound,
-                // Use TextDirection directly as an enum value
-                textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                textAlign: isRtl ? TextAlign.right : TextAlign.left,
-              )
-            else
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: issues.length,
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Row(
-                      // Use TextDirection directly as an enum value
-                      textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  if (result.analysisVersion.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(
                       children: [
-                        const Icon(Icons.warning, color: Colors.orange, size: 16),
+                        Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Theme.of(context).textTheme.bodyMedium?.color,
+                        ),
                         const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            issues[index],
-                            // Use TextDirection directly as an enum value
-                            textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                            textAlign: isRtl ? TextAlign.right : TextAlign.left,
+                        Text(
+                          'Version ${result.analysisVersion}',
+                          style: GoogleFonts.roboto(
+                            fontSize: 16,
                           ),
                         ),
                       ],
                     ),
-                  );
-                },
+                  ],
+                ],
               ),
+            ),
+          ),
+          
+          // Job description (if available)
+          if (result.hasJobDescription) ...[
+            const SizedBox(height: 16),
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      appLocalizations.jobDescription,
+                      style: GoogleFonts.montserrat(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      result.jobDescription,
+                      style: GoogleFonts.roboto(
+                        fontSize: 16,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSection(String title, String content, bool isRtl) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              textAlign: isRtl ? TextAlign.right : TextAlign.left,
-            ),
-            const Divider(),
-            const SizedBox(height: 10),
-            Text(
-              content,
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              textAlign: isRtl ? TextAlign.right : TextAlign.left,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildKeywordSection(List<String> keywords, AppLocalizations appLocalizations, bool isRtl) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Text(
-              appLocalizations.keySkills,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              textAlign: isRtl ? TextAlign.right : TextAlign.left,
-            ),
-            const Divider(),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              children: keywords
-                  .map((keyword) => Chip(
-                        label: Text(
-                          keyword,
-                          // Use TextDirection directly as an enum value
-                          textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+          
+          // Industry information (if available)
+          if (result.industry.isNotEmpty && result.industry != 'General') ...[
+            const SizedBox(height: 16),
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Industry',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.business,
+                          size: 16,
+                          color: Theme.of(context).textTheme.bodyMedium?.color,
                         ),
-                        backgroundColor: Colors.blue[50],
-                      ))
-                  .toList(),
+                        const SizedBox(width: 8),
+                        Text(
+                          result.industry,
+                          style: GoogleFonts.roboto(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
-        ),
+          
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
 
-  Widget _buildScoreCard(AnalysisResult result, AppLocalizations appLocalizations, bool isRtl) {
-    final score = result.score;
-    final scoreColor = result.getScoreColor();
-    final scoreRating = result.getScoreRating(appLocalizations);
-    
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Text(
-              appLocalizations.atsCompatibilityScore,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              // Use TextDirection directly as an enum value
-              textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-              textAlign: isRtl ? TextAlign.right : TextAlign.left,
+  Widget _buildSkillsComparisonTab(AnalysisResult result, AppLocalizations appLocalizations) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Skills match percentage
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(height: 20),
-            Center(
-              child: Stack(
-                alignment: Alignment.center,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    width: 150,
-                    height: 150,
-                    child: CircularProgressIndicator(
-                      value: score / 100,
-                      strokeWidth: 15,
-                      backgroundColor: Colors.grey[200],
-                      color: scoreColor,
+                  Text(
+                    appLocalizations.match,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).primaryColor,
                     ),
                   ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '$score%',
-                        style: TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                          color: scoreColor,
-                        ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: ScoreIndicator(
+                      score: result.matchPercentage.round().toDouble(),
+                      size: 120,
+                      strokeWidth: 10,
+                      textStyle: GoogleFonts.montserrat(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: _getMatchColor(result.matchPercentage),
                       ),
-                      Text(
-                        scoreRating,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: scoreColor,
-                        ),
+                      labelStyle: GoogleFonts.montserrat(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Theme.of(context).textTheme.bodyMedium?.color,
                       ),
-                    ],
+                      label: '%',
+                    ),
                   ),
                 ],
               ),
             ),
-            if (result.scoreBreakdown != null && result.scoreBreakdown!.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Text(
-                // Use a default string if scoreBreakdown is not defined in AppLocalizations
-                appLocalizations.scoreBreakdown ?? 'Score Breakdown',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                // Use TextDirection directly as an enum value
-                textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                textAlign: isRtl ? TextAlign.right : TextAlign.left,
-              ),
-              const SizedBox(height: 10),
-              ...result.scoreBreakdown!.entries.map((entry) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 5.0),
-                  child: Row(
-                    // Use TextDirection directly as an enum value
-                    textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        entry.key,
-                        // Use TextDirection directly as an enum value
-                        textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                      ),
-                      Text(
-                        '${entry.value is int ? entry.value : (entry.value is double ? (entry.value as double).toStringAsFixed(1) : entry.value.toString())}',
-                        // Use TextDirection directly as an enum value
-                        textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Matching skills
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appLocalizations.matchingSkills,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).primaryColor,
+                    ),
                   ),
-                );
-              }).toList(),
-            ],
+                  const SizedBox(height: 12),
+                  result.matchingKeywords.isNotEmpty
+                      ? Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: result.matchingKeywords.map((keyword) {
+                            return KeywordChip(
+                              keyword: keyword,
+                              isMatched: true,
+                            );
+                          }).toList(),
+                        )
+                      : Text(
+                          appLocalizations.noMatchingSkills,
+                          style: GoogleFonts.roboto(
+                            fontSize: 16,
+                            fontStyle: FontStyle.italic,
+                            color: Theme.of(context).textTheme.bodyMedium?.color,
+                          ),
+                        ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Missing skills
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appLocalizations.missingSkills,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  result.missingKeywords.isNotEmpty
+                      ? Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: result.missingKeywords.map((keyword) {
+                            return KeywordChip(
+                              keyword: keyword,
+                              isMatched: false,
+                            );
+                          }).toList(),
+                        )
+                      : Text(
+                          appLocalizations.greatMatch,
+                          style: GoogleFonts.roboto(
+                            fontSize: 16,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.green,
+                          ),
+                        ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Education comparison (if available)
+          if (result.hasEducationComparison) ...[
+            const SizedBox(height: 16),
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      appLocalizations.educationComparison,
+                      style: GoogleFonts.montserrat(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      itemCount: result.educationComparison.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.school,
+                                size: 16,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  result.educationComparison[index],
+                                  style: GoogleFonts.roboto(
+                                    fontSize: 16,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
-        ),
+          
+          // Experience comparison (if available)
+          if (result.hasExperienceComparison) ...[
+            const SizedBox(height: 16),
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      appLocalizations.experienceComparison,
+                      style: GoogleFonts.montserrat(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      itemCount: result.experienceComparison.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.work,
+                                size: 16,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  result.experienceComparison[index],
+                                  style: GoogleFonts.roboto(
+                                    fontSize: 16,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          
+          const SizedBox(height: 24),
+        ],
       ),
     );
+  }
+
+  Widget _buildRecommendationsTab(AnalysisResult result, AppLocalizations appLocalizations) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Recommendations
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appLocalizations.recommendations,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  result.hasRecommendations
+                      ? ListView.builder(
+                          shrinkWrap: true,
+                          physics: NeverScrollableScrollPhysics(),
+                          itemCount: result.recommendations.length,
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12.0),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).primaryColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '${index + 1}',
+                                        style: GoogleFonts.montserrat(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      result.recommendations[index],
+                                      style: GoogleFonts.roboto(
+                                        fontSize: 16,
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        )
+                      : Text(
+                          'No specific recommendations at this time.',
+                          style: GoogleFonts.roboto(
+                            fontSize: 16,
+                            fontStyle: FontStyle.italic,
+                            color: Theme.of(context).textTheme.bodyMedium?.color,
+                          ),
+                        ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Searchability issues
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appLocalizations.searchabilityIssues,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  result.hasSearchabilityIssues
+                      ? ListView.builder(
+                          shrinkWrap: true,
+                          physics: NeverScrollableScrollPhysics(),
+                          itemCount: result.searchabilityIssues.length,
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8.0),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.warning_amber_rounded,
+                                    size: 18,
+                                    color: Colors.orange,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      result.searchabilityIssues[index],
+                                      style: GoogleFonts.roboto(
+                                        fontSize: 16,
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        )
+                      : Text(
+                          appLocalizations.noIssuesFound,
+                          style: GoogleFonts.roboto(
+                            fontSize: 16,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.green,
+                          ),
+                        ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Missing sections (if available)
+          if (result.hasMissingSections) ...[
+            const SizedBox(height: 16),
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Missing Sections',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      itemCount: result.missingSections.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.highlight_off,
+                                size: 18,
+                                color: Colors.red,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  result.missingSections[index],
+                                  style: GoogleFonts.roboto(
+                                    fontSize: 16,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          
+          // Identified sections (if available)
+          if (result.hasIdentifiedSections) ...[
+            const SizedBox(height: 16),
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Identified Sections',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      itemCount: result.identifiedSections.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.check_circle_outline,
+                                size: 18,
+                                color: Colors.green,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  result.identifiedSections[index],
+                                  style: GoogleFonts.roboto(
+                                    fontSize: 16,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // New tab for score breakdown
+  Widget _buildScoreBreakdownTab(AnalysisResult result, AppLocalizations appLocalizations) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Overall score
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appLocalizations.atsCompatibilityScore,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: ScoreIndicator(
+                      score: result.score.toDouble(),
+                      size: 120,
+                      strokeWidth: 10,
+                      textStyle: GoogleFonts.montserrat(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: result.getScoreColor(),
+                      ),
+                      labelStyle: GoogleFonts.montserrat(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Theme.of(context).textTheme.bodyMedium?.color,
+                      ),
+                      label: result.getScoreRating(appLocalizations),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Component scores
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appLocalizations.scoreBreakdown,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Keyword Match Score
+                  _buildScoreBar(
+                    'Keyword Match',
+                    result.keywordMatchScore,
+                    Colors.blue,
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Formatting Score
+                  _buildScoreBar(
+                    'Formatting',
+                    result.formattingScore,
+                    Colors.purple,
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Content Score
+                  _buildScoreBar(
+                    'Content',
+                    result.contentScore,
+                    Colors.green,
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Readability Score
+                  _buildScoreBar(
+                    'Readability',
+                    result.readabilityScore,
+                    Colors.orange,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Detailed score breakdown (if available)
+          if (result.scoreBreakdown != null && result.scoreBreakdown!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Detailed Breakdown',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ...result.scoreBreakdown!.entries.map((entry) {
+                      // Skip entries that are already shown as component scores
+                      if (['keyword_match', 'formatting', 'content', 'readability']
+                          .contains(entry.key.toLowerCase().replaceAll(' ', '_'))) {
+                        return SizedBox.shrink();
+                      }
+                      
+                      // Format the key for display
+                      final displayKey = entry.key
+                          .split('_')
+                          .map((word) => word.isNotEmpty 
+                              ? word[0].toUpperCase() + word.substring(1) 
+                              : '')
+                          .join(' ');
+                      
+                      // Get the score value
+                      final scoreValue = entry.value is int 
+                          ? entry.value as int 
+                          : (entry.value is double 
+                              ? (entry.value as double).round() 
+                              : 0);
+                      
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: _buildScoreBar(
+                          displayKey,
+                          scoreValue,
+                          _getRandomColor(entry.key),
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScoreBar(String label, int score, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.roboto(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Text(
+              '$score/100',
+              style: GoogleFonts.montserrat(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: _getScoreColor(score),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: score / 100,
+            backgroundColor: Colors.grey[300],
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+            minHeight: 8,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getScoreColor(int score) {
+    if (score >= 80) {
+      return Colors.green;
+    } else if (score >= 60) {
+      return Colors.orange;
+    } else {
+      return Colors.red;
+    }
   }
 
   Color _getMatchColor(double percentage) {
@@ -819,15 +1439,28 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     }
   }
 
-  Future<void> _exportResults(ResultController controller) async {
-    // This would be implemented to export the results to a file
-    // For now, we'll just show a snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        // Use a default string if exportSuccess is not defined in AppLocalizations
-        content: Text(AppLocalizations.of(context).export),
-        backgroundColor: Colors.green,
-      ),
-    );
+  // Generate a consistent color based on string input
+  Color _getRandomColor(String input) {
+    final colors = [
+      Colors.blue,
+      Colors.purple,
+      Colors.green,
+      Colors.orange,
+      Colors.teal,
+      Colors.pink,
+      Colors.indigo,
+      Colors.amber,
+      Colors.cyan,
+      Colors.deepOrange,
+    ];
+    
+    // Simple hash function to get a consistent index
+    int hash = 0;
+    for (var i = 0; i < input.length; i++) {
+      hash = (hash + input.codeUnitAt(i)) % colors.length;
+    }
+    
+    return colors[hash];
   }
 }
+

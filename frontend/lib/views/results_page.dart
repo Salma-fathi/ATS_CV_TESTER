@@ -3,7 +3,6 @@ import 'package:frontend/main.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
-import 'dart:math';
 
 import '../ controllers/cv_controller.dart';
 import '../ widgets/scoring_system.dart';

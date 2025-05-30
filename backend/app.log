@@ -131,3 +131,53 @@
 2025-05-23 20:16:42,863 - werkzeug - WARNING -  * Running on all addresses.
    WARNING: This is a development server. Do not use it in a production deployment.
 2025-05-23 20:16:42,864 - werkzeug - INFO -  * Running on http://192.168.1.18:5000/ (Press CTRL+C to quit)
+2025-05-26 21:04:26,647 - utils.text_analyzer - WARNING - Arabic model not found, using blank model
+2025-05-26 21:04:26,878 - utils.text_analyzer - INFO - Text analyzer initialized with multilingual support
+2025-05-26 21:04:26,878 - __main__ - WARNING - GOOGLE_API_KEY not set, Gemini features will be disabled
+2025-05-26 21:04:26,942 - werkzeug - WARNING -  * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+2025-05-26 21:04:26,942 - werkzeug - INFO -  * Running on http://192.168.1.18:5000/ (Press CTRL+C to quit)
+2025-05-26 21:16:34,053 - __main__ - INFO - Successfully validated and extracted text from Salma_Mohammed__CV_.pdf. Language: en
+2025-05-26 21:16:34,081 - __main__ - INFO - Using language: en for analysis.
+2025-05-26 21:16:34,081 - __main__ - INFO - No job description provided.
+2025-05-26 21:16:35,462 - __main__ - INFO - API Analyze: Successfully analyzed Salma_Mohammed__CV_.pdf. Returning 200.
+2025-05-26 21:16:35,467 - werkzeug - INFO - 127.0.0.1 - - [26/May/2025 21:16:35] "POST /api/analyze HTTP/1.1" 200 -
+2025-05-27 20:18:34,122 - utils.text_analyzer - WARNING - Arabic model not found, using blank model
+2025-05-27 20:18:34,503 - utils.text_analyzer - INFO - Text analyzer initialized with multilingual support
+2025-05-27 20:18:34,503 - __main__ - WARNING - GOOGLE_API_KEY not set, Gemini features will be disabled
+2025-05-27 20:18:34,532 - werkzeug - WARNING -  * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+2025-05-27 20:18:34,532 - werkzeug - INFO -  * Running on http://192.168.1.18:5000/ (Press CTRL+C to quit)
+2025-05-27 20:21:23,828 - __main__ - INFO - Successfully validated and extracted text from Salma_Flutter__Full-Stack_Developer_Resume.pdf. Language: en
+2025-05-27 20:21:23,830 - __main__ - INFO - Using language: en for analysis.
+2025-05-27 20:21:23,831 - __main__ - INFO - No job description provided.
+2025-05-27 20:21:24,500 - __main__ - INFO - API Analyze: Successfully analyzed Salma_Flutter__Full-Stack_Developer_Resume.pdf. Returning 200.
+2025-05-27 20:21:24,502 - werkzeug - INFO - 127.0.0.1 - - [27/May/2025 20:21:24] "POST /api/analyze HTTP/1.1" 200 -
+2025-05-27 20:46:02,243 - utils.enhanced_text_analyzer - WARNING - Arabic model not found, using blank model
+2025-05-27 20:46:02,431 - utils.enhanced_text_analyzer - INFO - Enhanced text analyzer initialized with multilingual support
+2025-05-27 20:46:03,665 - utils.enhanced_analysis_service - WARNING - GOOGLE_API_KEY not set, Gemini features will be disabled
+2025-05-27 20:46:03,665 - __main__ - WARNING - GOOGLE_API_KEY not set, Gemini features will be disabled
+2025-05-27 20:46:03,752 - werkzeug - WARNING -  * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+2025-05-27 20:46:03,753 - werkzeug - INFO -  * Running on http://192.168.1.18:5000/ (Press CTRL+C to quit)
+2025-05-27 20:46:03,781 - werkzeug - INFO -  * Restarting with stat
+2025-05-27 20:46:05,802 - utils.enhanced_text_analyzer - WARNING - Arabic model not found, using blank model
+2025-05-27 20:46:05,944 - utils.enhanced_text_analyzer - INFO - Enhanced text analyzer initialized with multilingual support
+2025-05-27 20:46:06,303 - utils.enhanced_analysis_service - INFO - Gemini API initialized successfully
+2025-05-27 20:46:06,303 - __main__ - INFO - Gemini API initialized successfully
+2025-05-27 20:46:06,318 - werkzeug - WARNING -  * Debugger is active!
+2025-05-27 20:46:06,584 - werkzeug - INFO -  * Debugger PIN: 890-240-886
+2025-05-27 20:57:31,979 - __main__ - ERROR - API Analyze: Unhandled exception in /api/analyze endpoint.
+Traceback (most recent call last):
+  File "/home/salma/project/ATS_CV_TESTER/backend/app.py", line 73, in analyze_endpoint
+    if not file_processor.allowed_file(file.filename, ALLOWED_EXTENSIONS):
+TypeError: FileProcessor.allowed_file() takes 1 positional argument but 2 were given
+2025-05-27 20:57:32,266 - werkzeug - INFO - 127.0.0.1 - - [27/May/2025 20:57:32] "[35m[1mPOST /api/analyze HTTP/1.1[0m" 500 -
+2025-05-27 20:57:49,875 - __main__ - ERROR - API Analyze: Unhandled exception in /api/analyze endpoint.
+Traceback (most recent call last):
+  File "/home/salma/project/ATS_CV_TESTER/backend/app.py", line 73, in analyze_endpoint
+    if not file_processor.allowed_file(file.filename, ALLOWED_EXTENSIONS):
+TypeError: FileProcessor.allowed_file() takes 1 positional argument but 2 were given
+2025-05-27 20:57:49,876 - werkzeug - INFO - 127.0.0.1 - - [27/May/2025 20:57:49] "[35m[1mPOST /api/analyze HTTP/1.1[0m" 500 -
+2025-05-27 21:18:03,992 - werkzeug - INFO -  * Detected change in '/home/salma/project/ATS_CV_TESTER/backend/app.py', reloading
+2025-05-27 21:18:23,110 - werkzeug - INFO -  * Restarting with stat

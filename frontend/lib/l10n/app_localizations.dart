@@ -42,18 +42,17 @@ class AppLocalizations {
       'needsImprovement': 'Needs Improvement',
       'exportSuccess': 'Results exported successfully',
       'scoreBreakdown': 'Score Breakdown',
-      'errorTimeout': 'The request timed out. Please try again.',
-      'errorNoFile': 'No file selected. Please select a file to upload.',
-      'errorAnalysisFailed': 'Analysis failed. Please try again later.',
-      'errorInvalidFile': 'Invalid file type. Please upload a valid CV file.',
-      'errorFileSize': 'File size exceeds the limit. Please upload a smaller file.',
-      'errorFileUpload': 'File upload error: Please try again or use a different browser',
-      'errorFileData': 'File data could not be loaded. Please try again or select a different file.',
-      'errorFileCorrupted': 'The selected file appears to be empty or corrupted. Please select a different file.',
-      'errorFilePath': 'File path is unavailable. Please check your file and try again.',
-      'errorFileEmpty': 'The selected file is empty. Please select a different file.',
-      'erroranalysisFailed': 'The analysis failed. Please try again later.',
-      'errorFileNotFound': 'The selected file was not found. Please select a different file.',
+      // Added error messages
+      'errorTimeout': 'Connection timed out. Please try again.',
+      'errorNoFile': 'No file selected. Please select a CV file.',
+      'errorAnalysisFailed': 'Analysis failed. Please try again or select a different file.',
+      'errorInvalidFile': 'Invalid file type. Please select a PDF or DOCX file.',
+      'errorFileSize': 'File size exceeds the maximum limit. Please select a smaller file.',
+      'errorInvalidFileFormat': 'File format not supported. Please use PDF or DOCX format.',
+      'errorAnalysisTimeout': 'Analysis is taking longer than expected. Please try again.',
+      'errorNoFileContent': 'File appears to be empty. Please select a valid CV file.',
+      'errorServerError': 'Server error occurred. Please try again later.',
+      'errorNetworkIssue': 'Network connection issue. Please check your internet connection.',
     },
     'ar': {
       'analysisResults': 'نتائج التحليل',
@@ -83,6 +82,17 @@ class AppLocalizations {
       'needsImprovement': 'يحتاج إلى تحسين',
       'exportSuccess': 'تم تصدير النتائج بنجاح',
       'scoreBreakdown': 'تفصيل الدرجات',
+      // Added error messages in Arabic
+      'errorTimeout': 'انتهت مهلة الاتصال. يرجى المحاولة مرة أخرى.',
+      'errorNoFile': 'لم يتم اختيار ملف. يرجى اختيار ملف السيرة الذاتية.',
+      'errorAnalysisFailed': 'فشل التحليل. يرجى المحاولة مرة أخرى أو اختيار ملف مختلف.',
+      'errorInvalidFile': 'نوع ملف غير صالح. يرجى اختيار ملف PDF أو DOCX.',
+      'errorFileSize': 'حجم الملف يتجاوز الحد الأقصى. يرجى اختيار ملف أصغر.',
+      'errorInvalidFileFormat': 'تنسيق الملف غير مدعوم. يرجى استخدام تنسيق PDF أو DOCX.',
+      'errorAnalysisTimeout': 'يستغرق التحليل وقتًا أطول من المتوقع. يرجى المحاولة مرة أخرى.',
+      'errorNoFileContent': 'يبدو أن الملف فارغ. يرجى اختيار ملف سيرة ذاتية صالح.',
+      'errorServerError': 'حدث خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقًا.',
+      'errorNetworkIssue': 'مشكلة في اتصال الشبكة. يرجى التحقق من اتصالك بالإنترنت.',
     },
   };
 
@@ -113,20 +123,19 @@ class AppLocalizations {
   String get needsImprovement => _localizedValues[locale.languageCode]?['needsImprovement'] ?? 'Needs Improvement';
   String get exportSuccess => _localizedValues[locale.languageCode]?['exportSuccess'] ?? 'Results exported successfully';
   String get scoreBreakdown => _localizedValues[locale.languageCode]?['scoreBreakdown'] ?? 'Score Breakdown';
-  String get errorTimeout => _localizedValues[locale.languageCode]?['errorTimeout'] ?? 'The request timed out. Please try again.';
-  String get errorNoFile => _localizedValues[locale.languageCode]?['errorNoFile'] ?? 'No file selected. Please select a file to upload.';
-  String get errorAnalysisFailed => _localizedValues[locale.languageCode]?['errorAnalysisFailed'] ?? 'Analysis failed. Please try again later.';
-  String get errorInvalidFile => _localizedValues[locale.languageCode]?['errorInvalidFile'] ?? 'Invalid file type. Please upload a valid CV file.';
-  String get errorFileSize => _localizedValues[locale.languageCode]?['errorFileSize'] ?? 'File size exceeds the limit. Please upload a smaller file.';
-  String get errorFileUpload => _localizedValues[locale.languageCode]?['errorFileUpload'] ?? 'File upload error: Please try again or use a different browser';
-  String get errorFileData => _localizedValues[locale.languageCode]?['errorFileData'] ?? 'File data could not be loaded. Please try again or select a different file.';
-  String get errorFileCorrupted => _localizedValues[locale.languageCode]?['errorFileCorrupted'] ?? 'The selected file appears to be empty or corrupted. Please select a different file.';
-  String get errorFilePath => _localizedValues[locale.languageCode]?['errorFilePath'] ?? 'File path is unavailable. Please check your file and try again.';
-  String get errorFileEmpty => _localizedValues[locale.languageCode]?['errorFileEmpty'] ?? 'The selected file is empty. Please select a different file.';
-  String get errorFileNotFound => _localizedValues[locale.languageCode]?['errorFileNotFound'] ?? 'The selected file was not found. Please select a different file.';
-  String get erroranalysisFailed => _localizedValues[locale.languageCode]?['erroranalysisFailed'] ?? 'The analysis failed. Please try again later.';
   
-  }
+  // Added error message getters
+  String get errorTimeout => _localizedValues[locale.languageCode]?['errorTimeout'] ?? 'Connection timed out. Please try again.';
+  String get errorNoFile => _localizedValues[locale.languageCode]?['errorNoFile'] ?? 'No file selected. Please select a CV file.';
+  String get errorAnalysisFailed => _localizedValues[locale.languageCode]?['errorAnalysisFailed'] ?? 'Analysis failed. Please try again or select a different file.';
+  String get errorInvalidFile => _localizedValues[locale.languageCode]?['errorInvalidFile'] ?? 'Invalid file type. Please select a PDF or DOCX file.';
+  String get errorFileSize => _localizedValues[locale.languageCode]?['errorFileSize'] ?? 'File size exceeds the maximum limit. Please select a smaller file.';
+  String get errorInvalidFileFormat => _localizedValues[locale.languageCode]?['errorInvalidFileFormat'] ?? 'File format not supported. Please use PDF or DOCX format.';
+  String get errorAnalysisTimeout => _localizedValues[locale.languageCode]?['errorAnalysisTimeout'] ?? 'Analysis is taking longer than expected. Please try again.';
+  String get errorNoFileContent => _localizedValues[locale.languageCode]?['errorNoFileContent'] ?? 'File appears to be empty. Please select a valid CV file.';
+  String get errorServerError => _localizedValues[locale.languageCode]?['errorServerError'] ?? 'Server error occurred. Please try again later.';
+  String get errorNetworkIssue => _localizedValues[locale.languageCode]?['errorNetworkIssue'] ?? 'Network connection issue. Please check your internet connection.';
+}
 
 class AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const AppLocalizationsDelegate();

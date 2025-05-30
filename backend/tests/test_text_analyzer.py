@@ -1,6 +1,6 @@
 # Add to tests/test_text_analyzer.py (new file)
 import unittest
-from utils.text_analyzer import TextAnalyzer
+from backend.utils.enhanced_text_analyzer import TextAnalyzer
 
 class TestTextAnalyzer(unittest.TestCase):
     """Test cases for TextAnalyzer class."""

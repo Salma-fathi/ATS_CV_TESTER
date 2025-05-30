@@ -1,7 +1,7 @@
 flask==2.0.1
 flask-cors==3.0.10
 python-dotenv==0.19.0
-google-generativeai==0.3.0
+google-generativeai==0.8.5
 spacy==3.7.2
 PyPDF2==3.0.1
 python-docx==0.8.11

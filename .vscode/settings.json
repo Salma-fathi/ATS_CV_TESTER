@@ -1,3 +1,7 @@
 {
-    "git.ignoreLimitWarning": true
+    "git.ignoreLimitWarning": true,
+    "python.defaultInterpreterPath": "/home/salma/project/ATS_CV_TESTER/backend/venv/bin/python",
+    "python.analysis.extraPaths": [
+        "/home/salma/project/ATS_CV_TESTER/backend/venv/lib/python3.10/site-packages"
+    ]
 }
