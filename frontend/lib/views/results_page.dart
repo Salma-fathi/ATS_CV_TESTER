@@ -603,6 +603,7 @@ class _ResultsPageState extends State<ResultsPage> with TickerProviderStateMixin
             result.formattingScore,
             'How well your CV is formatted for ATS systems',
             Icons.format_align_left,
+            
           ),
           
           // Content score
