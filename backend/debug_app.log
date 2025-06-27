@@ -436,3 +436,60 @@
 2025-06-24 21:50:09,514 - werkzeug - INFO -  * Restarting with stat
 2025-06-24 21:50:09,752 - werkzeug - WARNING -  * Debugger is active!
 2025-06-24 21:50:09,792 - werkzeug - INFO -  * Debugger PIN: 816-555-079
+2025-06-24 22:25:22,259 - __main__ - DEBUG - Starting analysis request processing
+2025-06-24 22:25:24,432 - __main__ - DEBUG - File received: Amira-Resume.pdf
+2025-06-24 22:25:24,433 - __main__ - DEBUG - File extension validated: pdf
+2025-06-24 22:25:24,546 - __main__ - DEBUG - File read successfully, size: 103529 bytes
+2025-06-24 22:25:24,758 - __main__ - DEBUG - Secured filename: Amira-Resume.pdf
+2025-06-24 22:25:31,629 - __main__ - DEBUG - PDF text extracted, length: 4490
+2025-06-24 22:25:31,637 - __main__ - DEBUG - Detected language: en
+2025-06-24 22:25:31,637 - __main__ - INFO - Successfully validated and extracted text from Amira-Resume.pdf. Language: en
+2025-06-24 22:25:31,637 - __main__ - INFO - Using language: en for analysis.
+2025-06-24 22:25:31,637 - __main__ - INFO - No job description provided.
+2025-06-24 22:25:31,637 - __main__ - DEBUG - Attempting to use EnhancedAnalysisService
+2025-06-24 22:25:42,810 - utils.enhanced_text_analyzer - WARNING - Arabic model not found, using blank model
+2025-06-24 22:25:42,995 - utils.enhanced_text_analyzer - INFO - Enhanced text analyzer initialized with multilingual support
+2025-06-24 22:25:45,688 - utils.enhanced_analysis_service - INFO - Gemini API initialized successfully
+2025-06-24 22:25:46,476 - __main__ - DEBUG - Enhanced analysis completed successfully
+2025-06-24 22:25:46,476 - __main__ - INFO - API Analyze: Successfully analyzed Amira-Resume.pdf. Returning 200.
+2025-06-24 22:25:46,480 - werkzeug - INFO - 127.0.0.1 - - [24/Jun/2025 22:25:46] "POST /api/analyze HTTP/1.1" 200 -
+2025-06-24 22:45:52,882 - __main__ - DEBUG - Starting analysis request processing
+2025-06-24 22:45:52,884 - __main__ - DEBUG - File received: eltagi_resume.pdf
+2025-06-24 22:45:52,884 - __main__ - DEBUG - File extension validated: pdf
+2025-06-24 22:45:52,884 - __main__ - DEBUG - File read successfully, size: 324324 bytes
+2025-06-24 22:45:52,885 - __main__ - DEBUG - Secured filename: eltagi_resume.pdf
+2025-06-24 22:45:52,957 - __main__ - DEBUG - PDF text extracted, length: 4642
+2025-06-24 22:45:52,957 - __main__ - DEBUG - Detected language: en
+2025-06-24 22:45:52,957 - __main__ - INFO - Successfully validated and extracted text from eltagi_resume.pdf. Language: en
+2025-06-24 22:45:52,957 - __main__ - INFO - Using language: en for analysis.
+2025-06-24 22:45:52,957 - __main__ - INFO - No job description provided.
+2025-06-24 22:45:52,957 - __main__ - DEBUG - Attempting to use EnhancedAnalysisService
+2025-06-24 22:45:53,762 - utils.enhanced_text_analyzer - WARNING - Arabic model not found, using blank model
+2025-06-24 22:45:53,831 - utils.enhanced_text_analyzer - INFO - Enhanced text analyzer initialized with multilingual support
+2025-06-24 22:45:53,831 - utils.enhanced_analysis_service - INFO - Gemini API initialized successfully
+2025-06-24 22:45:54,270 - __main__ - DEBUG - Enhanced analysis completed successfully
+2025-06-24 22:45:54,271 - __main__ - INFO - API Analyze: Successfully analyzed eltagi_resume.pdf. Returning 200.
+2025-06-24 22:45:54,274 - werkzeug - INFO - 127.0.0.1 - - [24/Jun/2025 22:45:54] "POST /api/analyze HTTP/1.1" 200 -
+2025-06-27 21:23:04,403 - werkzeug - WARNING -  * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+2025-06-27 21:23:04,512 - werkzeug - INFO -  * Running on http://192.168.1.18:5000/ (Press CTRL+C to quit)
+2025-06-27 21:23:04,518 - werkzeug - INFO -  * Restarting with stat
+2025-06-27 21:23:04,739 - werkzeug - WARNING -  * Debugger is active!
+2025-06-27 21:23:05,083 - werkzeug - INFO -  * Debugger PIN: 379-960-541
+2025-06-27 21:30:16,975 - __main__ - DEBUG - Starting analysis request processing
+2025-06-27 21:30:17,031 - __main__ - DEBUG - File received: Cv.ksa.pdf
+2025-06-27 21:30:17,032 - __main__ - DEBUG - File extension validated: pdf
+2025-06-27 21:30:17,033 - __main__ - DEBUG - File read successfully, size: 56304 bytes
+2025-06-27 21:30:17,033 - __main__ - DEBUG - Secured filename: Cv.ksa.pdf
+2025-06-27 21:30:18,261 - __main__ - DEBUG - PDF text extracted, length: 2555
+2025-06-27 21:30:18,262 - __main__ - DEBUG - Detected language: en
+2025-06-27 21:30:18,262 - __main__ - INFO - Successfully validated and extracted text from Cv.ksa.pdf. Language: en
+2025-06-27 21:30:18,262 - __main__ - INFO - Using language: en for analysis.
+2025-06-27 21:30:18,262 - __main__ - INFO - No job description provided.
+2025-06-27 21:30:18,262 - __main__ - DEBUG - Attempting to use EnhancedAnalysisService
+2025-06-27 21:30:42,719 - utils.enhanced_text_analyzer - WARNING - Arabic model not found, using blank model
+2025-06-27 21:30:42,986 - utils.enhanced_text_analyzer - INFO - Enhanced text analyzer initialized with multilingual support
+2025-06-27 21:30:51,585 - utils.enhanced_analysis_service - INFO - Gemini API initialized successfully
+2025-06-27 21:30:52,651 - __main__ - DEBUG - Enhanced analysis completed successfully
+2025-06-27 21:30:52,677 - __main__ - INFO - API Analyze: Successfully analyzed Cv.ksa.pdf. Returning 200.
+2025-06-27 21:30:52,684 - werkzeug - INFO - 127.0.0.1 - - [27/Jun/2025 21:30:52] "POST /api/analyze HTTP/1.1" 200 -
