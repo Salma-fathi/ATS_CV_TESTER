@@ -106,8 +106,17 @@ def generate_fallback_analysis(language='en') -> Dict[str, Any]:
         "score_breakdown": {
             "keyword_score": keyword_score,
             "format_score": format_score,
+            "content_score": 62,
             "readability_score": readability_score
         },
+        "keyword_match_score": keyword_score,
+        "formatting_score": format_score,
+        "content_score": 62,
+        "readability_score": readability_score,
+        "identified_sections": ["Education", "Experience", "Skills"],
+        "missing_sections": [],
+        "industry": "General",
+        "analysis_version": "1.1",
         "success": True
     }
 

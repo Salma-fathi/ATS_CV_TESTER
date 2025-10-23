@@ -134,10 +134,34 @@ class EnhancedTextAnalyzer:
         
         patterns = section_patterns['ar'] if language == 'ar' else section_patterns['en']
         sections_found = 0
+        identified_sections: List[str] = []
         
         for pattern in patterns:
             if re.search(pattern, resume_text, re.IGNORECASE):
                 sections_found += 1
+                # Add a simple human-readable label from the pattern head
+                if language == 'ar':
+                    if 'التعليم' in pattern:
+                        identified_sections.append('التعليم')
+                    elif 'الخبرة' in pattern or 'التاريخ المهني' in pattern:
+                        identified_sections.append('الخبرة')
+                    elif 'المهارات' in pattern:
+                        identified_sections.append('المهارات')
+                    elif 'المشاريع' in pattern or 'الإنجازات' in pattern:
+                        identified_sections.append('المشاريع/الإنجازات')
+                    elif 'معلومات الاتصال' in pattern or 'الملف الشخصي' in pattern:
+                        identified_sections.append('معلومات الاتصال')
+                else:
+                    if 'education' in pattern:
+                        identified_sections.append('Education')
+                    elif 'experience' in pattern or 'employment' in pattern or 'work history' in pattern:
+                        identified_sections.append('Experience')
+                    elif 'skills' in pattern or 'competencies' in pattern or 'expertise' in pattern:
+                        identified_sections.append('Skills')
+                    elif 'projects' in pattern or 'achievements' in pattern or 'portfolio' in pattern:
+                        identified_sections.append('Projects/Achievements')
+                    elif 'contact' in pattern or 'profile' in pattern:
+                        identified_sections.append('Contact')
         
         # Calculate section score (max 30 points)
         section_score = min(30, sections_found * 6)
@@ -222,9 +246,18 @@ class EnhancedTextAnalyzer:
                 issues.append("Insufficient contact information. Add email, phone number, and LinkedIn profile.")
         
         # Return formatting analysis
+        # Compute missing sections heuristically
+        if language == 'ar':
+            desired = ['التعليم', 'الخبرة', 'المهارات']
+        else:
+            desired = ['Education', 'Experience', 'Skills']
+        missing_sections = [s for s in desired if s not in identified_sections]
+
         return {
             "score": formatting_score,
-            "issues": issues
+            "issues": issues,
+            "identified_sections": identified_sections,
+            "missing_sections": missing_sections
         }
 
     def analyze_content_quality(self, resume_text: str) -> Dict[str, Any]:
@@ -544,21 +577,29 @@ class EnhancedTextAnalyzer:
                 keyword_match_analysis = self.analyze_keyword_match(resume_text, job_description)
                 result["job_description"] = job_description
             
+            # Extract component scores (normalized 0-100)
+            keyword_score = 0
+            if job_description:
+                keyword_score = keyword_match_analysis["score"]
+            formatting_score = max(0, min(100, int(formatting_analysis["score"])) )
+            content_score = max(0, min(100, int(content_analysis["score"])) )
+            readability_score = max(0, min(100, int(readability_analysis["score"])) )
+
             # Calculate overall score
             if job_description:
                 # With job description, keyword match is more important
                 overall_score = int(
-                    0.35 * keyword_match_analysis["score"] +
-                    0.25 * formatting_analysis["score"] +
-                    0.25 * content_analysis["score"] +
-                    0.15 * readability_analysis["score"]
+                    0.35 * keyword_score +
+                    0.25 * formatting_score +
+                    0.25 * content_score +
+                    0.15 * readability_score
                 )
             else:
                 # Without job description, focus more on content and formatting
                 overall_score = int(
-                    0.40 * formatting_analysis["score"] +
-                    0.40 * content_analysis["score"] +
-                    0.20 * readability_analysis["score"]
+                    0.40 * formatting_score +
+                    0.40 * content_score +
+                    0.20 * readability_score
                 )
             
             # Ensure score is between 0 and 100
@@ -566,6 +607,16 @@ class EnhancedTextAnalyzer:
             
             # Add scores to result
             result["score"] = overall_score
+            result["keyword_match_score"] = keyword_score
+            result["formatting_score"] = formatting_score
+            result["content_score"] = content_score
+            result["readability_score"] = readability_score
+            result["score_breakdown"] = {
+                "keyword_score": keyword_score,
+                "format_score": formatting_score,
+                "content_score": content_score,
+                "readability_score": readability_score
+            }
             
             # Generate summary based on overall score
             if language == 'ar':
@@ -663,6 +714,14 @@ class EnhancedTextAnalyzer:
                     "Avoid using complex graphics or tables that may not be parsed correctly."
                 ]
             
+            # Pass through identified/missing sections from formatting analysis
+            result["identified_sections"] = formatting_analysis.get("identified_sections", [])
+            result["missing_sections"] = formatting_analysis.get("missing_sections", [])
+
+            # Add basic industry placeholder if not present
+            result.setdefault("industry", "General")
+            result.setdefault("analysis_version", "1.1")
+
             return result
 
         except Exception as e:
